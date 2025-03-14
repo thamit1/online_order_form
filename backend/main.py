@@ -84,6 +84,7 @@ async def broadcast(message: dict):
     """
     async with lock:
         for connection in active_connections:
+            print(f"The host name for connection is {connection.client.host}")
             await connection.send_json(message)
 
 @app.get("/orders", response_model=List[OrderResponse])

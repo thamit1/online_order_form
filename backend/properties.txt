@@ -1,0 +1,43 @@
+# properties.txt
+
+# General Information
+Application Name: Order Management System
+Description: A FastAPI application for managing orders with WebSocket support for real-time updates.
+Version: 1.0.0
+Author: Your Name
+Date: March 15, 2025
+
+# Modules
+Modules:
+    - fastapi: FastAPI framework for building APIs.
+    - sqlalchemy.orm: ORM for interacting with the database.
+    - models: Contains the SQLAlchemy models.
+    - schemas: Contains Pydantic schemas for request and response validation.
+    - database: Contains functions for database operations.
+    - asyncio: Provides support for asynchronous programming.
+    - typing: Provides support for type hints.
+
+# Middleware
+Middleware:
+    - CORSMiddleware: Middleware to handle Cross-Origin Resource Sharing (CORS).
+
+# Endpoints
+Endpoints:
+    - GET /orders: Get a list of all orders.
+    - POST /orders: Create a new order.
+    - PUT /orders/{order_id}: Update an existing order.
+    - WebSocket /ws: WebSocket endpoint for handling real-time connections.
+
+# Functions
+Functions:
+    - get_db: Dependency function to get a database session.
+    - websocket_endpoint: WebSocket endpoint for handling real-time connections.
+    - broadcast: Sends a message to all active WebSocket connections.
+    - read_orders: Endpoint to get a list of all orders.
+    - create_order: Endpoint to create a new order.
+    - edit_order: Endpoint to update an existing order.
+
+# Usage
+Usage:
+    Run this module directly to start the FastAPI application with Uvicorn.
+    Command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2 --reload
