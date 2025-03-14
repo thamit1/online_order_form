@@ -1,6 +1,8 @@
 env/
 node_modules/
 __pycache__/
+.vscode/
+old/
 *.sqlite3
 *.log
 *.db
