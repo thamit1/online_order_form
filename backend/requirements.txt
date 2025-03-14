@@ -1,0 +1,8 @@
+fastapi==0.95.1
+uvicorn[standard]==0.21.1
+sqlalchemy==1.4.46
+pydantic==1.10.7
+websockets==11.0.3
+
+# Optional Dependencies for Development
+python-dotenv==1.0.0  # For environment variable management
