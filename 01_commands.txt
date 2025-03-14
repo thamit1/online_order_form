@@ -10,3 +10,13 @@ To start UI server
 cd frontend
 npm start
 
+
+git init
+git add .
+
+git commit -m "Initial commit: Order Management System"
+
+git remote add origin https://github.com/thamit1/online_order_form.git
+git push -u origin main
+
+
