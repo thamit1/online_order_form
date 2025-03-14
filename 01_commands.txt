@@ -1,0 +1,12 @@
+npx create-react-app frontend
+cd frontend
+npm install axios react-table
+
+To start backend
+cd backend
+python main.py
+
+To start UI server
+cd frontend
+npm start
+
