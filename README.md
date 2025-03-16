@@ -95,3 +95,5 @@ Add a new order.
     "quantity": 1,
     "price": 1200
   }
+
+![Quick Demo of multi instance update](assets/demo.gif)
