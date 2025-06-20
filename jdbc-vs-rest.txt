@@ -1,0 +1,70 @@
+import time
+import requests
+import cx_Oracle
+
+# --- Oracle DB connection (simulate JDBC) ---
+def query_oracle():
+    dsn = cx_Oracle.makedsn("your-db-host", 1521, service_name="your_service")
+    conn = cx_Oracle.connect(user="your_user", password="your_pass", dsn=dsn)
+    cursor = conn.cursor()
+
+    start = time.time()
+    cursor.execute("SELECT * FROM users FETCH FIRST 100 ROWS ONLY")
+    rows = cursor.fetchall()
+    end = time.time()
+
+    cursor.close()
+    conn.close()
+    return end - start, len(rows)
+
+# --- REST API call ---
+def query_rest():
+    start = time.time()
+    response = requests.get("https://your-api-host/api/users?limit=100")
+    data = response.json()
+    end = time.time()
+    return end - start, len(data)
+
+# --- Run both tests ---
+if __name__ == "__main__":
+    jdbc_time, jdbc_rows = query_oracle()
+    rest_time, rest_rows = query_rest()
+
+    print(f"JDBC-style Oracle query: {jdbc_time:.3f}s for {jdbc_rows} rows")
+    print(f"REST API call:          {rest_time:.3f}s for {rest_rows} rows")
+
+
+#############################################################
+
+
+# filename: app.py
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import cx_Oracle
+import os
+
+app = FastAPI()
+
+# Oracle connection config (use env vars or secrets manager in prod)
+DB_USER = os.getenv("ORACLE_USER", "your_user")
+DB_PASS = os.getenv("ORACLE_PASS", "your_pass")
+DB_DSN  = os.getenv("ORACLE_DSN", "your-db-host:1521/your_service")
+
+@app.get("/api/users")
+def get_users(limit: int = 100):
+    try:
+        conn = cx_Oracle.connect(DB_USER, DB_PASS, DB_DSN)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM users FETCH FIRST :limit ROWS ONLY", [limit])
+        columns = [col[0].lower() for col in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return JSONResponse(content=results)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
