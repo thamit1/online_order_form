@@ -1,67 +1,121 @@
+# benchmark.py
+
 import time
 import requests
 import cx_Oracle
+import random
 
-# --- Oracle DB connection (simulate JDBC) ---
-def query_oracle():
-    dsn = cx_Oracle.makedsn("your-db-host", 1521, service_name="your_service")
-    conn = cx_Oracle.connect(user="your_user", password="your_pass", dsn=dsn)
+DB_USER = "your_user"
+DB_PASS = "your_pass"
+DB_DSN  = "your-db-host:1521/your_service"
+REST_URL = "https://your-api-host/api/users"
+BASE_ID = random.randint(100000, 999999)
+
+def generate_users(count=100):
+    return [{"id": BASE_ID + i, "name": f"User{BASE_ID+i}", "email": f"user{BASE_ID+i}@mail.com"} for i in range(count)]
+
+def insert_oracle(users):
+    conn = cx_Oracle.connect(DB_USER, DB_PASS, DB_DSN)
     cursor = conn.cursor()
-
+    cursor.prepare("INSERT INTO users (id, name, email) VALUES (:1, :2, :3)")
+    data = [(u["id"], u["name"], u["email"]) for u in users]
     start = time.time()
-    cursor.execute("SELECT * FROM users FETCH FIRST 100 ROWS ONLY")
+    cursor.executemany(None, data)
+    conn.commit()
+    end = time.time()
+    cursor.close()
+    conn.close()
+    return end - start, len(data)
+
+def select_oracle(limit=100):
+    conn = cx_Oracle.connect(DB_USER, DB_PASS, DB_DSN)
+    cursor = conn.cursor()
+    start = time.time()
+    cursor.execute("SELECT * FROM users FETCH FIRST :limit ROWS ONLY", [limit])
     rows = cursor.fetchall()
     end = time.time()
-
     cursor.close()
     conn.close()
     return end - start, len(rows)
 
-# --- REST API call ---
-def query_rest():
+def insert_rest(users):
     start = time.time()
-    response = requests.get("https://your-api-host/api/users?limit=100")
-    data = response.json()
+    res = requests.post(REST_URL, json=users)
     end = time.time()
-    return end - start, len(data)
+    return end - start, res.json().get("inserted", 0)
 
-# --- Run both tests ---
+def select_rest(limit=100):
+    start = time.time()
+    res = requests.get(REST_URL, params={"limit": limit})
+    end = time.time()
+    return end - start, len(res.json())
+
 if __name__ == "__main__":
-    jdbc_time, jdbc_rows = query_oracle()
-    rest_time, rest_rows = query_rest()
+    users = generate_users(100)
 
-    print(f"JDBC-style Oracle query: {jdbc_time:.3f}s for {jdbc_rows} rows")
-    print(f"REST API call:          {rest_time:.3f}s for {rest_rows} rows")
+    t1_ins, n1_ins = insert_oracle(users)
+    t1_sel, n1_sel = select_oracle()
+    print(f"JDBC-style Oracle INSERT: {n1_ins} rows in {t1_ins:.3f}s")
+    print(f"JDBC-style Oracle SELECT: {n1_sel} rows in {t1_sel:.3f}s\n")
+
+    t2_ins, n2_ins = insert_rest(users)
+    t2_sel, n2_sel = select_rest()
+    print(f"REST API INSERT:           {n2_ins} rows in {t2_ins:.3f}s")
+    print(f"REST API SELECT:           {n2_sel} rows in {t2_sel:.3f}s")
 
 
 #############################################################
 
 
-# filename: app.py
+# app.py
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
+from typing import List
 import cx_Oracle
 import os
 
 app = FastAPI()
 
-# Oracle connection config (use env vars or secrets manager in prod)
 DB_USER = os.getenv("ORACLE_USER", "your_user")
 DB_PASS = os.getenv("ORACLE_PASS", "your_pass")
 DB_DSN  = os.getenv("ORACLE_DSN", "your-db-host:1521/your_service")
 
-@app.get("/api/users")
-def get_users(limit: int = 100):
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
+
+@app.post("/api/users")
+def insert_users(users: List[User]):
     try:
         conn = cx_Oracle.connect(DB_USER, DB_PASS, DB_DSN)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM users FETCH FIRST :limit ROWS ONLY", [limit])
+        cursor.prepare("INSERT INTO users (id, name, email) VALUES (:1, :2, :3)")
+        data = [(u.id, u.name, u.email) for u in users]
+        cursor.executemany(None, data)
+        conn.commit()
+        return {"inserted": len(data)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except:
+            pass
+
+@app.get("/api/users")
+def get_users(limit: int = Query(100)):
+    try:
+        conn = cx_Oracle.connect(DB_USER, DB_PASS, DB_DSN)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users FETCH FIRST :limit ROWS ONLY", [limit])
         columns = [col[0].lower() for col in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        return JSONResponse(content=results)
+        return results
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         try:
             cursor.close()
